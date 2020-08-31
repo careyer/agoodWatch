@@ -17,8 +17,6 @@ Created by Lewis he on October 10, 2019.
 #include "string.h"
 #include <Ticker.h>
 
-#define RTC_TIME_ZONE   "GMT"
-
 LV_FONT_DECLARE(Ubuntu);
 LV_IMG_DECLARE(bg);
 LV_IMG_DECLARE(bg1);
@@ -63,6 +61,91 @@ static void setting_event_cb();
 static void bluetooth_event_cb();
 static void about_event_cb();
 static void wifi_destory();
+
+#ifdef DEBUG_EVENTS
+#define DEBUG_EVENTS
+/*
+ * This is for debugging the LVGL library, requires LV_USE_LOG setting in lv_conf.h
+ */
+void my_log_cb(lv_log_level_t level, const char * file, int line, const char * fn_name, const char * dsc)
+{
+  /*Send the logs via serial port*/
+  if(level == LV_LOG_LEVEL_ERROR) Serial.print("ERROR: ");
+  if(level == LV_LOG_LEVEL_WARN)  Serial.print("WARNING: ");
+  if(level == LV_LOG_LEVEL_INFO)  Serial.print("INFO: ");
+  if(level == LV_LOG_LEVEL_TRACE) Serial.print("TRACE: ");
+
+  Serial.printf("%s:%d:%s: %s\n", file, line, fn_name, dsc);
+}
+
+static void my_test_event_cb(lv_obj_t * obj, lv_event_t event)
+{
+    Serial.printf ("my_test_event (%p, %d) : ", obj, event);
+
+    switch(event) {
+        case LV_EVENT_PRESSED:
+            Serial.println("LV_EVENT_PRESSED");
+            break;
+
+        case LV_EVENT_PRESSING:
+            Serial.println("LV_EVENT_PRESSING");
+            break;
+
+        case LV_EVENT_PRESS_LOST:
+            Serial.println("LV_EVENT_PRESS_LOST");
+            break;
+
+        case LV_EVENT_SHORT_CLICKED:
+            Serial.println("LV_EVENT_SHORT_CLICKED");
+            break;
+
+        case LV_EVENT_CLICKED:
+            Serial.println("LV_EVENT_CLICKED");
+            break;
+
+        case LV_EVENT_LONG_PRESSED:
+            Serial.println("LV_EVENT_LONG_PRESSED");
+            break;
+
+        case LV_EVENT_LONG_PRESSED_REPEAT:
+            Serial.println("LV_EVENT_LONG_PRESSED_REPEAT");
+            break;
+
+        case LV_EVENT_RELEASED:
+            Serial.println("LV_EVENT_RELEASED");
+            break;
+
+        case LV_EVENT_DRAG_BEGIN:
+            Serial.println("LV_EVENT_DRAG_BEGIN");
+            break;
+
+        case LV_EVENT_DRAG_END:
+            Serial.println("LV_EVENT_DRAG_END");
+            break;
+
+        case LV_EVENT_DRAG_THROW_BEGIN:
+            Serial.println("LV_EVENT_DRAG_THROW_BEGIN");
+            break;
+
+        case LV_EVENT_GESTURE:
+            Serial.printf("LV_EVENT_GESTURE dir=%d\n", (int)lv_indev_get_gesture_dir(lv_indev_get_act()));
+            break;
+
+        case LV_EVENT_KEY:
+            Serial.println("LV_EVENT_KEY");
+            break;
+        case LV_EVENT_FOCUSED:
+            Serial.println("LV_EVENT_FOCUSED");
+            break;
+        case LV_EVENT_DEFOCUSED:
+            Serial.println("LV_EVENT_DEFOCUSED");
+            break;
+        case LV_EVENT_LEAVE:
+            Serial.println("LV_EVENT_LEAVE");
+            break;
+    }
+}
+#endif
 
 class StatusBar
 {
@@ -325,6 +408,8 @@ static void event_handler(lv_obj_t *obj, lv_event_t event)
 
 void setupGui()
 {
+    //lv_log_register_print_cb((lv_log_print_g_cb_t)my_log_cb);
+
     lv_obj_t *scr = lv_scr_act();
     
     lv_style_init(&settingStyle);
@@ -335,19 +420,39 @@ void setupGui()
     lv_style_set_text_color(&settingStyle, LV_OBJ_PART_MAIN, LV_COLOR_WHITE);
     lv_style_set_image_recolor(&settingStyle, LV_OBJ_PART_MAIN, LV_COLOR_WHITE);
     
-    // Create the torch and ensure that it is at the back of all other widgets.
+    /* 
+     * Create the torch and ensure that it is at the back of all other widgets.
+     * I tried creating a label and a container before finally stumbling upon
+     * the positioning functionality I wanted with a button.
+     */
     torchLabel = lv_btn_create (scr, NULL);
     static lv_style_t torchStyle;
     lv_style_copy(&torchStyle, &settingStyle);
     lv_style_set_bg_color(&torchStyle, LV_OBJ_PART_MAIN, LV_COLOR_WHITE);
     lv_style_set_bg_opa(&torchStyle, LV_OBJ_PART_MAIN, 255);
-    lv_style_set_image_recolor(&torchStyle, LV_OBJ_PART_MAIN, LV_COLOR_CYAN);
+    lv_style_set_text_color(&torchStyle, LV_OBJ_PART_MAIN, LV_COLOR_RED);
     lv_obj_add_style(torchLabel, LV_OBJ_PART_MAIN, &torchStyle);
-    //lv_label_set_text(torchLabel, "TORCH MODE");
+    lv_obj_set_size(torchLabel, LV_HOR_RES, LV_VER_RES - 30);
     lv_obj_move_background(torchLabel);
-    lv_obj_set_pos(torchLabel, 0, 0);
-    lv_obj_set_size(torchLabel, LV_HOR_RES, LV_VER_RES);
-    
+    lv_obj_set_pos(torchLabel, 0, 30);
+    lv_obj_t *l = lv_label_create (torchLabel, NULL);
+
+    /*
+     * I have a suspicion that this scroll mode eats battery!
+     */
+    //lv_label_set_long_mode(l, LV_LABEL_LONG_SROLL_CIRC);    // LVGL spelling mistake!
+    //lv_obj_set_width(l, 100);
+    lv_label_set_text(l, "  TORCH MODE  ");
+    lv_obj_align(l, NULL, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_set_user_data(torchLabel, l);
+    /*
+     * There seems to be an LVGL buglet that allows the scrolling label to bleed through
+     * to the tile menu. Hiding it makes the ghost image disappear.
+     */
+    //lv_obj_set_hidden (l, true);
+
+//Maybe I should just hide the torchLabel then I wouldn't have to jump through hoops?????
+
     //Create wallpaper
     void *images[] = {(void *) &bg, (void *) &bg1, (void *) &bg2, (void *) &bg3 };
     lv_obj_t *img_bin = lv_img_create(scr, NULL);  /*Create an image object*/
@@ -383,6 +488,7 @@ void setupGui()
     
     lv_obj_align(mainBar, bar.self(), LV_ALIGN_OUT_BOTTOM_MID, 0, 0);
 
+
     //! Time
     static lv_style_t timeStyle;
     static lv_style_t dateStyle;
@@ -397,6 +503,12 @@ void setupGui()
     lv_obj_add_style(dateLabel, LV_OBJ_PART_MAIN, &dateStyle);
     //lv_label_set_long_mode(dateLabel, LV_LABEL_LONG_SROLL_CIRC);
     updateTime();
+    
+#ifdef DEBUG_EVENTS    
+    lv_obj_set_gesture_parent(mainBar,0);
+    lv_obj_set_event_cb(mainBar, my_test_event_cb);
+    //lv_obj_set_event_cb(lv_scr_act(), my_test_event_cb);
+#endif
 
     //! menu
     static lv_style_t style_pr;
@@ -405,7 +517,6 @@ void setupGui()
     lv_style_set_text_color(&style_pr, LV_OBJ_PART_MAIN, lv_color_hex3(0xaaa));
 
     menuBtn = lv_imgbtn_create(mainBar, NULL);
-    lv_imgbtn_set_src(menuBtn, LV_BTN_STATE_ACTIVE, &menu);
     lv_imgbtn_set_src(menuBtn, LV_BTN_STATE_RELEASED, &menu);
     lv_imgbtn_set_src(menuBtn, LV_BTN_STATE_PRESSED, &menu);
     lv_imgbtn_set_src(menuBtn, LV_BTN_STATE_CHECKED_RELEASED, &menu);
@@ -429,7 +540,6 @@ void updateTime()
     time_t now;
     struct tm  info;
     char buf[64];
-    static char weekDays[7][4] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
     TTGOClass *ttgo = TTGOClass::getWatch();
     extern unsigned int screenTimeout;
     
@@ -438,8 +548,8 @@ void updateTime()
     strftime(buf, sizeof(buf), "%H:%M:%S", &info);
     lv_label_set_text(timeLabel, buf);
     lv_obj_align(timeLabel, NULL, LV_ALIGN_IN_TOP_MID, 0, 10);
-    strftime(buf, sizeof(buf), "%d/%m/%Y", &info);
-    lv_label_set_text_fmt(dateLabel, "%s %s", weekDays[info.tm_wday],buf);
+    strftime(buf, sizeof(buf), "%a %d/%m/%Y", &info);
+    lv_label_set_text (dateLabel, buf);
     lv_obj_align(dateLabel, NULL, LV_ALIGN_CENTER, 0, 0);
 
     if (screenTimeout == DEFAULT_SCREEN_TIMEOUT)
@@ -457,6 +567,7 @@ void updateTime()
 
 void torchOn ()
 {
+  //lv_obj_set_hidden ((lv_obj_t*)lv_obj_get_user_data (torchLabel), false);
   lv_obj_move_foreground(torchLabel);
 }
 
@@ -466,6 +577,7 @@ void torchOff ()
   
   screenTimeout = DEFAULT_SCREEN_TIMEOUT;
   lv_obj_move_background(torchLabel);
+  //lv_obj_set_hidden ((lv_obj_t*)lv_obj_get_user_data (torchLabel), true);
   updateTime ();
 }
 
@@ -528,6 +640,7 @@ static void view_event_handler(lv_obj_t *obj, lv_event_t event)
  *
  */
 
+#define NEW_KBD
 
 class Keyboard
 {
@@ -568,26 +681,59 @@ public:
 
         _kbCont = lv_cont_create(parent, NULL);
         lv_obj_set_size(_kbCont, LV_HOR_RES, LV_VER_RES - 30);
+#ifdef NEW_KBD
+        lv_obj_set_pos(_kbCont, 0, 30);
+#else
         lv_obj_align(_kbCont, NULL, LV_ALIGN_CENTER, 0, 0);
+#endif  // NEW_KBD.
         lv_obj_add_style(_kbCont, LV_OBJ_PART_MAIN, &kbStyle);
 
 
+#ifdef NEW_KBD
+        _kbPage = lv_page_create(_kbCont, NULL);
+        lv_page_set_scrlbar_mode(_kbPage, LV_SCROLLBAR_MODE_OFF);
+        lv_obj_set_size (_kbPage, LV_HOR_RES, LV_VER_RES - 30 - 20);
+        lv_obj_set_pos(_kbPage, 0, 20);
+        lv_page_set_scrl_width(_kbPage,480);
+        lv_page_set_scrl_height(_kbPage,190);
+#endif  // NEW_KBD.
+
         lv_obj_t *ta = lv_textarea_create(_kbCont, NULL);
+#ifdef NEW_KBD
+        lv_obj_set_height(ta, 20);
+        lv_obj_set_pos(ta, 0, 0);
+#else
         lv_obj_set_height(ta, 40);
+#endif // NEW_KDB.
+
         lv_textarea_set_one_line(ta, true);
         lv_textarea_set_pwd_mode(ta, false);
         lv_textarea_set_text(ta, "");
-        lv_obj_align(ta, _kbCont, LV_ALIGN_IN_TOP_MID, 0, 10);
 
+#ifdef NEW_KBD
+        lv_obj_t *kb = lv_keyboard_create(_kbPage, NULL);
+        lv_obj_set_pos(ta, 0, 0);
+        lv_obj_set_height(kb, LV_VER_RES - 30 - 20);
+        lv_obj_set_width(kb, 480);
+        lv_obj_move_foreground (_kbCont);
+	      lv_obj_set_pos (kb, 0, 0);
+#else
         lv_obj_t *kb = lv_keyboard_create(_kbCont, NULL);
+        lv_obj_align(ta, _kbCont, LV_ALIGN_IN_TOP_MID, 0, 10);
         lv_keyboard_set_map(kb, LV_KEYBOARD_MODE_TEXT_LOWER, btnm_mapplus[0]);
         lv_obj_set_height(kb, LV_VER_RES / 3 * 2);
         lv_obj_set_width(kb, 240);
-        lv_obj_align(kb, _kbCont, LV_ALIGN_IN_BOTTOM_MID, 0, 0);
+        lv_obj_align(kb, NULL, LV_ALIGN_IN_BOTTOM_MID, 0, 0);
+#endif  //NEW_KBD.
+
         lv_keyboard_set_textarea(kb, ta);
 
+#ifdef NEW_KBD
         lv_obj_add_style(kb, LV_OBJ_PART_MAIN, &kbStyle);
+#else
         lv_obj_add_style(ta, LV_OBJ_PART_MAIN, &kbStyle);
+#endif  //NEW_KBD.
+        lv_obj_set_x(lv_page_get_scrollable(_kbPage), 0);
         lv_obj_set_event_cb(kb, __kb_event_cb);
 
         _kb = this;
@@ -605,17 +751,31 @@ public:
         const char *txt = lv_btnmatrix_get_active_btn_text(kb);
         if (txt == NULL) return;
         static int index = 0;
-        if (strcmp(txt, LV_SYMBOL_OK) == 0) {
+        if ((strcmp(txt, LV_SYMBOL_OK) == 0) || (strcmp(txt, "Enter") == 0) || (strcmp(txt, LV_SYMBOL_NEW_LINE) == 0)){
             strcpy(__buf, lv_textarea_get_text(ext->ta));
             if (_kb->_cb != nullptr) {
                 _kb->_cb(KB_EVENT_OK);
             }
             return;
-        } else if (strcmp(txt, "Exit") == 0) {
+        } else if ((LV_EVENT_CANCEL == event) || (strcmp(txt, LV_SYMBOL_CLOSE) == 0)) {
             if (_kb->_cb != nullptr) {
                 _kb->_cb(KB_EVENT_EXIT);
             }
             return;
+#ifdef NEW_KBD
+        } else if (strcmp(txt, LV_SYMBOL_LEFT) == 0) {
+            log_i("LV_SYMBOL_LEFT before=%d",lv_obj_get_x(lv_page_get_scrollable(_kb->_kbPage)));
+            lv_page_scroll_hor(_kb->_kbPage, lv_obj_get_x(lv_page_get_scrollable(_kb->_kbPage)) - 240);
+            delay(250);
+            log_i ("LV_SYMBOL_LEFT after=%d", lv_obj_get_x(lv_page_get_scrollable(_kb->_kbPage)));
+        } else if (strcmp(txt, LV_SYMBOL_RIGHT) == 0) {
+            log_i("LV_SYMBOL_RIGHT before=%d", lv_obj_get_x(lv_page_get_scrollable(_kb->_kbPage)));
+            lv_page_scroll_hor(_kb->_kbPage, lv_obj_get_x(lv_page_get_scrollable(_kb->_kbPage)) *-1);
+            delay(250);
+            log_i("LV_SYMBOL_RIGHT after=%d", lv_obj_get_x(lv_page_get_scrollable(_kb->_kbPage)));
+        } else {
+            lv_keyboard_def_event_cb(kb, event);
+#else
         } else if (strcmp(txt, LV_SYMBOL_RIGHT) == 0) {
             index = index + 1 >= sizeof(btnm_mapplus) / sizeof(btnm_mapplus[0]) ? 0 : index + 1;
             lv_keyboard_set_map(kb, LV_KEYBOARD_MODE_TEXT_LOWER, btnm_mapplus[index]);
@@ -624,6 +784,7 @@ public:
             lv_textarea_del_char(ext->ta);
         } else {
             lv_textarea_add_text(ext->ta, txt);
+#endif  // NEW_KBD.
         }
     }
 
@@ -643,6 +804,9 @@ public:
     }
 
 private:
+#ifdef NEW_KBD
+    lv_obj_t *_kbPage = nullptr;
+#endif  // NEW_KBD.
     lv_obj_t *_kbCont = nullptr;
     kb_event_cb _cb = nullptr;
     static const char *btnm_mapplus[10][23];
@@ -774,7 +938,6 @@ public:
             lv_label_set_text(la1, cfg[i].name);
             i == 0 ? lv_obj_align(la1, NULL, LV_ALIGN_IN_TOP_LEFT, 30, 20) : lv_obj_align(la1, prev, LV_ALIGN_OUT_BOTTOM_MID, 0, 20);
             _sw[i] = lv_imgbtn_create(_swCont, NULL);
-            lv_imgbtn_set_src(_sw[i], LV_BTN_STATE_ACTIVE, &off);
             lv_imgbtn_set_src(_sw[i], LV_BTN_STATE_RELEASED, &off);
             lv_imgbtn_set_src(_sw[i], LV_BTN_STATE_PRESSED, &off);
             lv_imgbtn_set_src(_sw[i], LV_BTN_STATE_CHECKED_RELEASED, &off);
@@ -786,7 +949,6 @@ public:
         }
 
         _exitBtn = lv_imgbtn_create(_swCont, NULL);
-        lv_imgbtn_set_src(_exitBtn, LV_BTN_STATE_ACTIVE, &iexit);
         lv_imgbtn_set_src(_exitBtn, LV_BTN_STATE_RELEASED, &iexit);
         lv_imgbtn_set_src(_exitBtn, LV_BTN_STATE_PRESSED, &iexit);
         lv_imgbtn_set_src(_exitBtn, LV_BTN_STATE_CHECKED_RELEASED, &iexit);
@@ -826,7 +988,6 @@ public:
                     const void *src =  lv_imgbtn_get_src(sw, LV_BTN_STATE_RELEASED);
                     const void *dst = src == &off ? &on : &off;
                     bool en = src == &off;
-                    lv_imgbtn_set_src(sw, LV_BTN_STATE_ACTIVE, dst);
                     lv_imgbtn_set_src(sw, LV_BTN_STATE_RELEASED, dst);
                     lv_imgbtn_set_src(sw, LV_BTN_STATE_PRESSED, dst);
                     lv_imgbtn_set_src(sw, LV_BTN_STATE_CHECKED_RELEASED, dst);
@@ -845,7 +1006,6 @@ public:
         if (index > _count)return;
         lv_obj_t *sw = _sw[index];
         const void *dst =  en ? &on : &off;
-        lv_imgbtn_set_src(sw, LV_BTN_STATE_ACTIVE, dst);
         lv_imgbtn_set_src(sw, LV_BTN_STATE_RELEASED, dst);
         lv_imgbtn_set_src(sw, LV_BTN_STATE_PRESSED, dst);
         lv_imgbtn_set_src(sw, LV_BTN_STATE_CHECKED_RELEASED, dst);
@@ -1227,14 +1387,12 @@ static void wifi_sync_mbox_cb(lv_task_t *t)
     }
 }
 
-
-
-
 void wifi_sw_event_cb(uint8_t index, bool en)
 {
     switch (index) {
     case 0:
         if (en) {
+            setCpuFrequencyMhz(CPU_FREQ_WIFI);
             WiFi.begin();
         } else {
             WiFi.disconnect();
@@ -1469,12 +1627,12 @@ static void exit_about(lv_obj_t *obj, lv_event_t event)
 }
 
 static void about_event_cb()
-{
-  lv_obj_t *_exitBtn = nullptr;
-  lv_obj_t * table = nullptr;
+{ 
+  static lv_obj_t *_label = nullptr;
 
   if (about == nullptr)
   {
+    lv_obj_t *_exitBtn = nullptr;
     static lv_style_t barStyle;
     
     lv_style_init(&barStyle);
@@ -1485,12 +1643,12 @@ static void about_event_cb()
     lv_style_set_text_color(&barStyle, LV_OBJ_PART_MAIN, LV_COLOR_WHITE);
     lv_style_set_image_recolor(&barStyle, LV_OBJ_PART_MAIN, LV_COLOR_WHITE);
      
-    about = lv_cont_create(lv_scr_act(), NULL);
-    lv_obj_set_size(about, LV_HOR_RES, LV_VER_RES);
-    lv_obj_add_style(about, LV_OBJ_PART_MAIN, &barStyle);
+    about = lv_cont_create (lv_scr_act(), NULL);
+    lv_obj_set_size (about, LV_HOR_RES, LV_VER_RES - 30);
+    lv_obj_set_pos (about, 0, 30);
+    lv_obj_add_style (about, LV_OBJ_PART_MAIN, &barStyle);
 
-    _exitBtn = lv_imgbtn_create(about, NULL);
-    lv_imgbtn_set_src(_exitBtn, LV_BTN_STATE_ACTIVE, &iexit);
+    _exitBtn = lv_imgbtn_create (about, NULL);
     lv_imgbtn_set_src(_exitBtn, LV_BTN_STATE_RELEASED, &iexit);
     lv_imgbtn_set_src(_exitBtn, LV_BTN_STATE_PRESSED, &iexit);
     lv_imgbtn_set_src(_exitBtn, LV_BTN_STATE_CHECKED_RELEASED, &iexit);
@@ -1498,20 +1656,16 @@ static void about_event_cb()
     lv_obj_set_click(_exitBtn, true);
     lv_obj_align(_exitBtn, about, LV_ALIGN_IN_BOTTOM_MID, 0, 0);
     lv_obj_set_event_cb(_exitBtn, exit_about);
-    
-    table = lv_table_create(about, NULL);
-    
-    lv_table_set_col_cnt(table, 1);
-    lv_table_set_row_cnt(table, 2);
-    lv_obj_align(table, about, LV_ALIGN_IN_TOP_MID, 0, 0);
-    
-    /*Fill the column*/
-    lv_table_set_col_width(table, 0, 240);
-    lv_table_set_cell_value(table, 0, 0, "agoodWatch " THIS_VERSION_STR);
-    lv_table_set_cell_value(table, 1, 0, "By Alex Goodyear");
+
+    _label = lv_label_create (about, NULL);
+    lv_obj_add_style(_label, LV_OBJ_PART_MAIN, &barStyle);
   }
   else
   {
     lv_obj_set_hidden(about, false);
   }
+  
+  lv_label_set_text_fmt (_label, "\nagoodWatch %s\n(C) copyright Alex Goodyear\n%s\n\nCPU speed=%dMHz\nFree mem=%d",
+                           THIS_VERSION_STR, __DATE__, getCpuFrequencyMhz(), esp_get_free_heap_size());
+  lv_obj_align(_label, about, LV_ALIGN_IN_TOP_MID, 0, 0);
 }

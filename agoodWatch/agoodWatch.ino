@@ -5,8 +5,8 @@
  * https://github.com/AlexGoodyear/TTGO_TWatch_Library
  * 
  * Derived from the SimpleWatch example in https://github.com/Xinyuan-LilyGO/TTGO_TWatch_Library
- * 
- * Original copyright below ...
+ *
+ * Original header comment below ...
 Copyright (c) 2019 lewis he
 This is just a demonstration. Most of the functions are not implemented.
 The main implementation is low-power standby. 
@@ -25,14 +25,6 @@ Created by Lewis he on October 10, 2019.
 #include "esp_wifi.h"
 #include <WiFi.h>
 #include "gui.h"
-
-//#define DEBUG_SERIAL_OUTPUT  1
-
-#ifdef DEBUG_SERIAL_OUTPUT
-#define DSERIAL(_func, ...) Serial._func (__VA_ARGS__)
-#else
-#define DSERIAL(_func, ...)
-#endif
 
 #define G_EVENT_VBUS_PLUGIN         _BV(0)
 #define G_EVENT_VBUS_REMOVE         _BV(1)
@@ -69,6 +61,7 @@ void setupNetwork()
     WiFi.mode(WIFI_STA);
     WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info) {
         xEventGroupClearBits(g_event_group, G_EVENT_WIFI_CONNECTED);
+        setCpuFrequencyMhz(CPU_FREQ_NORM);
     }, WiFiEvent_t::SYSTEM_EVENT_STA_DISCONNECTED);
 
     WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info) {
@@ -88,7 +81,7 @@ void setupNetwork()
 void low_energy()
 {
     if (ttgo->bl->isOn()) {
-        DSERIAL(println, "low_energy() - BL is on");
+        log_i("low_energy() - BL is on");
         xEventGroupSetBits(isr_group, WATCH_FLAG_SLEEP_MODE);
         
         if (screenTimeout != DEFAULT_SCREEN_TIMEOUT)
@@ -102,18 +95,18 @@ void low_energy()
         ttgo->displaySleep();
 
         if (!WiFi.isConnected()) {
-            DSERIAL(println, "low_energy() - WiFi is off entering 2MHz mode");
+            log_i("low_energy() - WiFi is off entering 10MHz mode");
             delay(250);
             lenergy = true;
             WiFi.mode(WIFI_OFF);
-            rtc_clk_cpu_freq_set(RTC_CPU_FREQ_2M);
+            setCpuFrequencyMhz (CPU_FREQ_MIN); 
             gpio_wakeup_enable ((gpio_num_t)AXP202_INT, GPIO_INTR_LOW_LEVEL);
             gpio_wakeup_enable ((gpio_num_t)BMA423_INT1, GPIO_INTR_HIGH_LEVEL);
             esp_sleep_enable_gpio_wakeup ();
             esp_light_sleep_start();
         }
     } else {
-        DSERIAL(println, "low_energy() - BL is off");
+        log_i("low_energy() - BL is off");
         ttgo->startLvglTick();
         ttgo->displayWakeup();
         ttgo->rtc->syncToSystem();
@@ -125,7 +118,6 @@ void low_energy()
         ttgo->openBL();
         ttgo->bma->enableStepCountInterrupt(true);
         screenTimeout = DEFAULT_SCREEN_TIMEOUT;
-
     }
 }
 
@@ -257,20 +249,20 @@ void loop()
     if (bits & WATCH_FLAG_SLEEP_EXIT) {
         if (lenergy) {
             lenergy = false;
-            rtc_clk_cpu_freq_set(RTC_CPU_FREQ_160M);
+            setCpuFrequencyMhz (CPU_FREQ_NORM);
         }
 
         low_energy();
 
         if (bits & WATCH_FLAG_BMA_IRQ) {
-          DSERIAL(println, "WATCH_FLAG_BMA_IRQ");
+          log_i("WATCH_FLAG_BMA_IRQ");
             do {
                 rlst =  ttgo->bma->readInterrupt();
             } while (!rlst);
             xEventGroupClearBits(isr_group, WATCH_FLAG_BMA_IRQ);
         }
         if (bits & WATCH_FLAG_AXP_IRQ) {
-          DSERIAL(println, "WATCH_FLAG_AXP_IRQ");
+          log_i("WATCH_FLAG_AXP_IRQ");
             ttgo->power->readIRQ();
             ttgo->power->clearIRQ();
             xEventGroupClearBits(isr_group, WATCH_FLAG_AXP_IRQ);
@@ -287,7 +279,7 @@ void loop()
     if (xQueueReceive(g_event_queue_handle, &data, 5 / portTICK_RATE_MS) == pdPASS) {
         switch (data) {
         case Q_EVENT_BMA_INT:
-          DSERIAL(println, "Q_EVENT_BMA_IRQ");
+          log_i("Q_EVENT_BMA_IRQ");
 
             do {
                 rlst =  ttgo->bma->readInterrupt();
@@ -303,7 +295,7 @@ void loop()
               {
                  screenTimeout = 5 * 60 * 1000;
                  torchOn();
-                 rtc_clk_cpu_freq_set(RTC_CPU_FREQ_80M);
+                 setCpuFrequencyMhz (CPU_FREQ_MIN);
               }
             }
             
@@ -313,7 +305,7 @@ void loop()
             }
             break;
         case Q_EVENT_AXP_INT:
-          DSERIAL(println, "Q_EVENT_AXP_INT");
+          log_i("Q_EVENT_AXP_INT");
 
             ttgo->power->readIRQ();
             if (ttgo->power->isVbusPlugInIRQ()) {

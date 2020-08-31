@@ -4,11 +4,47 @@
 
 <img src="https://github.com/AlexGoodyear/agoodWatch/blob/master/images/agoodWatchV02.jpg" width="300" />
 
-First ensure that you have installed the TTGO_TWatch_Library, then put the agoodWatch directory into your Arduino sketch area.
+### Installation.
+First ensure that you have installed the [TTGO_TWatch_Library](https://github.com/AlexGoodyear/TTGO_TWatch_Library) into your Arduino/libraries directory. Next put the agoodWatch directory from this repository into your Arduino sketch area.
 
 This code is derived from the SimpleWatch example in the [Xinyuan LilyGO TTGO_TWatch GitHub repository](https://github.com/Xinyuan-LilyGO/TTGO_TWatch_Library).
 
-I have had to make some changes to the above library code for the low level access routines. (As of Version 0.2, all changes have been accepted into the main branch so all current versions of agoodWatch can use either my library fork or the LilyGO main branch.)
+### How to use.
+Wake the watch by ...
+1. raising your wrist to be horizontal in front of your face with the watch screen facing up, then rotate your wrist about 25 degrees so you can see the display better - the screen should wake up.
+2. press the bezel button
+3. double tap the watch
+
+If you cannont see the display because of bright sunlight, then double tap the watch to go to full brightness.
+
+If you double tap it again it will go into torch mode which is a white screen without the time displayed. This screen will stay active for 5 minutes or until you cancel with the bezel button.
+
+Use the bezel button at anytime to put the watch back into sleep mode (this will also cancel any temporary brightness or tourch mode).
+
+Use the square button under the time to enter the settings menu. Press on the door with an arrow to return to the previous screen. Drag an icon up or down to move to another setting. Press on an icon to see more settings. Only WiFi and About are currently active in this setup menu system.
+. 
+The WiFi and ntp time settings are taken directly from the original simpleWatch code - please don't raise issues about these functions, they obviously need work and it is on my todo list. I find the ntp times can vary a bit so just cancel an obviously incorrect time and try again.
+
+The new keyboard is now split over 2 screens that are side by side. Press the arrow button at the base of the keyboard to shift to the other screen. Use the "ABC"/"abc" button to move between lower and upper case characters. Use the "1#" button to change the keyboard over to numbers and punctuation characters. The "abc" button will return to the normal alphabet characters. The cross ("X") in the lower left will abandon any input and the carriage return and tick characters on the right of the keyboard will enter the typed text.
+
+### Known Issues.
+1. Most settings are hard coded - configurable settings are on my todo list.
+2. Customise your time zone setting using RTC_TIME_ZONE defined in gui.h - please read the comment above this definition and find a city in your time zone in the spreadsheet list and use the time zone code for that city.
+
+### Currently working on.
+1. New navigation strategy using swipes/gestures. (75% done)
+2. Configuration settings. (50% done)
+3. Multiple watch faces - animations and analogue. (40% done)
+4. Embedded Lua interpeter required for watch animataions (95% done will be released as a separate ESP32 library)
+
+### Version 0.5
+1. Update to latest Xinyuan-LilyGo TTGO_TWatch_Library including LVGL v7.3.1
+2. New keyboard design - this was much more work than the code changes reflect!
+
+### Version 0.4
+1. Tweak torch mode to still display status bar (for battery monitoring).
+2. Time is now based upon time zone strings.
+3. Improve the About screen.
 
 ### Version 0.3
 1. Forgot to put an exit button on the empty "About" screen - doh!
